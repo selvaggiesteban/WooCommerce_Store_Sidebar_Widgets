@@ -1,0 +1,18 @@
+.wssw-categories-container, .wssw-attributes-container, .wssw-price-filter { font-family: sans-serif; margin-bottom: 20px; }
+.wssw-back-link { display: block; margin-bottom: 10px; text-decoration: none; color: #007cba; font-weight: bold; cursor: pointer; }
+.wssw-category-list, .wssw-subcategory-list { list-style: none; padding: 0; margin: 0; }
+.wssw-category-item { margin: 5px 0; }
+.wssw-category-link-wrapper { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.wssw-category-link-wrapper a { text-decoration: none; color: #333; flex-grow: 1; }
+.wssw-toggle-icon { font-size: 10px; margin-left: 5px; transition: transform 0.3s; }
+.wssw-category-item.open > .wssw-category-link-wrapper .wssw-toggle-icon { transform: rotate(180deg); }
+.wssw-subcategory-list { padding-left: 15px; display: none; }
+.wssw-category-item.open > .wssw-subcategory-list { display: block; }
+.wssw-attribute-group { margin-bottom: 15px; }
+.wssw-attribute-title { font-size: 16px; margin-bottom: 10px; font-weight: 600; }
+.wssw-attribute-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.wssw-attribute-tag { border: 1px solid #ccc; padding: 5px 10px; text-decoration: none; color: #666; font-size: 13px; border-radius: 4px; background: #fff; }
+.wssw-price-slider-container { display: flex; flex-direction: column; gap: 10px; }
+.wssw-price-slider { width: 100%; cursor: pointer; }
+.wssw-price-values { display: flex; justify-content: space-between; font-size: 14px; }
+.wssw-filter-button { background: #333; color: #fff; border: none; padding: 8px; cursor: pointer; border-radius: 4px; }
