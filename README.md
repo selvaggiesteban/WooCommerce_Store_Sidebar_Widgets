@@ -26,12 +26,6 @@ REST `wssw/v1/price-range`). Applies WooCommerce-native `min_price` /
 The complete filter block (toggle button, fullscreen overlay on mobile,
 inline columns on desktop, active-filter chips, results counter).
 
-### 5. `[wssw_category_cards]`
-Category entry cards for home/catalog sections: `limit`, `columns` (1-6),
-`parent`, `hide_empty`, `show_count`. Uses the `product_cat` thumbnail when
-set, otherwise the newest product image in the category, otherwise the
-WooCommerce placeholder.
-
 ## Filtering mechanism (v2.3.0)
 
 Filter state lives in the URL and the plugin injects it into the page's own
@@ -85,5 +79,5 @@ filters don't intercept the links.
 
 1. Upload the `woocommerce-store-sidebar-widgets` folder to `/wp-content/plugins/`.
 2. Activate the plugin through the WordPress dashboard.
-3. Place `[wssw_responsive_filters]` (and optionally `[wssw_category_cards]`)
-   in Elementor templates or any other page builder.
+3. Place `[wssw_responsive_filters]` in Elementor templates or any other
+   page builder.
