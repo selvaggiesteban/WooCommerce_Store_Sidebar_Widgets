@@ -114,6 +114,7 @@ class WSSW_Rest_API {
 				}
 			}
 
+			// Fallback: build from root_parent (0 or context_cat ID)
 			return rest_ensure_response( $build( $root_parent ) );
 		}
 
