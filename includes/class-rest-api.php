@@ -59,6 +59,14 @@ class WSSW_Rest_API {
 		}
 
 		if ( $want_tree ) {
+			// If context category provided with tree=1, return tree starting from that category
+			$root_parent = 0;
+			if ( $context_cat ) {
+				$root_parent = (int) $context_cat->term_id;
+				// Include the context category itself as the root
+				$include_self = true;
+			}
+
 			$terms = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC' ) );
 			if ( is_wp_error( $terms ) ) {
 				return new WP_Error( 'wssw_terms_error', 'Error recuperando categorías', array( 'status' => 500 ) );
@@ -86,7 +94,27 @@ class WSSW_Rest_API {
 				}
 				return $out;
 			};
-			return rest_ensure_response( $build( 0 ) );
+
+			// If context category, build tree starting from it
+			if ( $context_cat ) {
+				// Get the context category data
+				$context_term = get_term( $context_cat->term_id, 'product_cat' );
+				if ( $context_term && ! is_wp_error( $context_term ) ) {
+					$children = $build( (int) $context_cat->term_id );
+					$response = array(
+						'id'            => (int) $context_cat->term_id,
+						'name'          => $context_term->name,
+						'slug'          => $context_term->slug,
+						'link'          => get_term_link( $context_term ),
+						'count'         => (int) $context_term->count,
+						'has_children'  => (bool) $children,
+						'children'      => $children,
+					);
+					return rest_ensure_response( array( $response ) );
+				}
+			}
+
+			return rest_ensure_response( $build( $root_parent ) );
 		}
 
 		// Determine parent: explicit ?parent=N takes priority, else context category, else 0 (top-level)
