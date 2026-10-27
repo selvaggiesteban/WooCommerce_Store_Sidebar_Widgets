@@ -169,11 +169,13 @@ class WSSW_Rest_API {
 		// If context category, get product IDs in that category (including children)
 		$context_product_ids = array();
 		if ( $context_cat ) {
-			$context_product_ids = get_objects_in_term( $context_cat->term_id, 'product_cat' );
-			if ( is_wp_error( $context_product_ids ) ) {
-				$context_product_ids = array();
-			}
-			$context_product_ids = array_map( 'intval', $context_product_ids );
+			// Use wc_get_products with category slug to include children
+			$products = wc_get_products( array(
+				'limit'   => -1,
+				'category' => $context_cat->slug,
+				'return'  => 'ids',
+			) );
+			$context_product_ids = array_map( 'intval', $products );
 		}
 
 		foreach ( $taxes as $name ) {
