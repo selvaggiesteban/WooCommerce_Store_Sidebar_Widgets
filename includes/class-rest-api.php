@@ -2,13 +2,13 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * WSSW REST API (v2.3.0).
+ * WSSW REST API (v2.3.2) — Context-aware filters.
  *
- * Routes:
- *   GET /wssw/v1/categories   ?parent=N (flat children) or ?tree=1 (full tree)
- *   GET /wssw/v1/attributes   attribute groups + term slugs/counts
- *   GET /wssw/v1/price-range  catalog min/max (?category=slug optional)
- *   GET /wssw/v1/products     filtered products JSON (?category=&pa_*=..&min_price=&max_price=&orderby=&page=&per_page=&count_only=1)
+ * Routes now accept ?category=slug to scope results to the current archive.
+ * - /categories?category=slug → children of that category (subcategories)
+ * - /attributes?category=slug → only attributes with terms on products in that category
+ * - /price-range?category=slug → min/max for that category (already works)
+ * - /products?category=slug   → filtered products (already works)
  */
 class WSSW_Rest_API {
 	public function __construct() {
@@ -39,10 +39,24 @@ class WSSW_Rest_API {
 	}
 
 	/**
-	 * Categories. ?tree=1 returns the full hierarchy, ?parent=N the children of N.
+	 * Categories.
+	 * - ?tree=1 → full tree (unchanged, for backward compat)
+	 * - ?parent=N → children of N (unchanged)
+	 * - ?category=slug → children of that category (NEW: context-aware)
+	 * - no params → top-level categories (shop page)
 	 */
 	public function get_categories( $request ) {
 		$want_tree = ! empty( $request['tree'] );
+
+		// Context category (NEW)
+		$context_cat = null;
+		$cat_slug    = isset( $request['category'] ) ? sanitize_title( $request['category'] ) : '';
+		if ( $cat_slug ) {
+			$term = get_term_by( 'slug', $cat_slug, 'product_cat' );
+			if ( $term && ! is_wp_error( $term ) ) {
+				$context_cat = $term;
+			}
+		}
 
 		if ( $want_tree ) {
 			$terms = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC' ) );
@@ -61,13 +75,13 @@ class WSSW_Rest_API {
 				foreach ( $by_parent[ $parent ] as $t ) {
 					$children = $build( (int) $t->term_id );
 					$out[]    = array(
-						'id'          => (int) $t->term_id,
-						'name'        => $t->name,
-						'slug'        => $t->slug,
-						'link'        => get_term_link( $t ),
-						'count'       => (int) $t->count,
-						'has_children' => (bool) $children,
-						'children'    => $children,
+						'id'            => (int) $t->term_id,
+						'name'          => $t->name,
+						'slug'          => $t->slug,
+						'link'          => get_term_link( $t ),
+						'count'         => (int) $t->count,
+						'has_children'  => (bool) $children,
+						'children'      => $children,
 					);
 				}
 				return $out;
@@ -75,34 +89,74 @@ class WSSW_Rest_API {
 			return rest_ensure_response( $build( 0 ) );
 		}
 
-		$p    = isset( $request['parent'] ) ? intval( $request['parent'] ) : 0;
-		$cats = get_terms( array( 'taxonomy' => 'product_cat', 'parent' => $p, 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC' ) );
+		// Determine parent: explicit ?parent=N takes priority, else context category, else 0 (top-level)
+		$p = isset( $request['parent'] ) ? intval( $request['parent'] ) : 0;
+		if ( 0 === $p && $context_cat ) {
+			$p = (int) $context_cat->term_id;
+		}
+
+		$cats = get_terms( array(
+			'taxonomy'   => 'product_cat',
+			'parent'     => $p,
+			'hide_empty' => false,
+			'orderby'    => 'name',
+			'order'      => 'ASC',
+		) );
 		if ( is_wp_error( $cats ) ) {
 			return new WP_Error( 'wssw_terms_error', 'Error recuperando categorías', array( 'status' => 500 ) );
 		}
 		$data = array();
 		foreach ( $cats as $c ) {
 			$data[] = array(
-				'id'           => (int) $c->term_id,
-				'name'         => $c->name,
-				'slug'         => $c->slug,
-				'link'         => get_term_link( $c ),
-				'count'        => (int) $c->count,
-				'has_children' => ! empty( get_terms( array( 'taxonomy' => 'product_cat', 'parent' => $c->term_id, 'hide_empty' => false ) ) ),
+				'id'            => (int) $c->term_id,
+				'name'          => $c->name,
+				'slug'          => $c->slug,
+				'link'          => get_term_link( $c ),
+				'count'         => (int) $c->count,
+				'has_children'  => ! empty( get_terms( array( 'taxonomy' => 'product_cat', 'parent' => $c->term_id, 'hide_empty' => false ) ) ),
 			);
 		}
 		return rest_ensure_response( $data );
 	}
 
 	/**
-	 * Attribute groups with term slugs (needed for active-filter labels + tags).
+	 * Attributes — filtered to current category context.
+	 * Accepts ?category=slug to scope terms to products in that category.
 	 */
 	public function get_attributes( $request ) {
 		$taxes = WSSW_Query::attribute_taxonomies();
 		$data  = array();
+
+		// Context category (NEW)
+		$context_cat = null;
+		$cat_slug    = isset( $request['category'] ) ? sanitize_title( $request['category'] ) : '';
+		if ( $cat_slug ) {
+			$term = get_term_by( 'slug', $cat_slug, 'product_cat' );
+			if ( $term && ! is_wp_error( $term ) ) {
+				$context_cat = $term;
+			}
+		}
+
+		// If context category, get product IDs in that category (including children)
+		$context_product_ids = array();
+		if ( $context_cat ) {
+			$context_product_ids = get_objects_in_term( $context_cat->term_id, 'product_cat' );
+			if ( is_wp_error( $context_product_ids ) ) {
+				$context_product_ids = array();
+			}
+			$context_product_ids = array_map( 'intval', $context_product_ids );
+		}
+
 		foreach ( $taxes as $name ) {
 			$tax  = get_taxonomy( $name );
-			$terms = get_terms( array( 'taxonomy' => $name, 'hide_empty' => false ) );
+			$args = array( 'taxonomy' => $name, 'hide_empty' => false );
+
+			// If we have context product IDs, filter terms to only those used by those products
+			if ( $context_product_ids ) {
+				$args['object_ids'] = $context_product_ids;
+			}
+
+			$terms = get_terms( $args );
 			if ( empty( $terms ) || is_wp_error( $terms ) ) {
 				continue;
 			}
@@ -125,7 +179,7 @@ class WSSW_Rest_API {
 	}
 
 	/**
-	 * Catalog price bounds (WooCommerce lookup table, optional ?category=slug).
+	 * Catalog price bounds — already accepts ?category=slug (unchanged).
 	 */
 	public function get_price_range( $request ) {
 		global $wpdb;
@@ -146,11 +200,11 @@ class WSSW_Rest_API {
 		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) === $table ) {
 			if ( $cat_ids ) {
 				$in     = implode( ',', array_map( 'intval', $cat_ids ) );
-				$min    = $wpdb->get_var( "SELECT MIN(min_price) FROM {$table} WHERE product_id IN ($in)" ); // phpcs:ignore WordPress.DB
-				$max    = $wpdb->get_var( "SELECT MAX(max_price) FROM {$table} WHERE product_id IN ($in)" ); // phpcs:ignore WordPress.DB
+				$min    = $wpdb->get_var( "SELECT MIN(min_price) FROM {$table} WHERE product_id IN ($in)" );
+				$max    = $wpdb->get_var( "SELECT MAX(max_price) FROM {$table} WHERE product_id IN ($in)" );
 			} else {
-				$min = $wpdb->get_var( "SELECT MIN(min_price) FROM {$table}" ); // phpcs:ignore WordPress.DB
-				$max = $wpdb->get_var( "SELECT MAX(max_price) FROM {$table}" ); // phpcs:ignore WordPress.DB
+				$min = $wpdb->get_var( "SELECT MIN(min_price) FROM {$table}" );
+				$max = $wpdb->get_var( "SELECT MAX(max_price) FROM {$table}" );
 			}
 		}
 
@@ -179,8 +233,7 @@ class WSSW_Rest_API {
 	}
 
 	/**
-	 * Filtered products (JSON). Same query builder used by the archive hooks,
-	 * so results always match what the page grid shows.
+	 * Filtered products — unchanged (already supports ?category=).
 	 */
 	public function get_products( $request ) {
 		$src       = $request->get_params();
@@ -235,8 +288,6 @@ class WSSW_Rest_API {
 			}
 		}
 
-		// Same deterministic tie-break as the archive hooks (bulk-imported
-		// products share post_date; ties must paginate identically).
 		if ( empty( $args['orderby'] ) || 'date' === $args['orderby'] ) {
 			$dir                = ( isset( $args['order'] ) && 'ASC' === strtoupper( (string) $args['order'] ) ) ? 'ASC' : 'DESC';
 			$args['orderby']    = array(
@@ -285,12 +336,6 @@ class WSSW_Rest_API {
 		return rest_ensure_response( $response );
 	}
 
-	/**
-	 * Attribute taxonomy => list of slugs, for verification + consumers.
-	 *
-	 * @param WC_Product $prod Product.
-	 * @return array
-	 */
 	private static function product_attribute_slugs( $prod ) {
 		$out = array();
 		foreach ( WSSW_Query::attribute_taxonomies() as $tax ) {

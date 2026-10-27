@@ -116,7 +116,8 @@
     function loadCategories() {
         var root = document.getElementById('wssw-categories-root');
         if (!root) { return Promise.resolve(); }
-        return fetch(apiRoot + 'categories?tree=1')
+        var catUrl = apiRoot + 'categories?tree=1' + (currentCatSlug ? '&category=' + encodeURIComponent(currentCatSlug) : '');
+        return fetch(catUrl)
             .then(function (r) { return r.json(); })
             .then(function (tree) {
                 indexNodes(tree, null);
@@ -132,7 +133,8 @@
     function loadAttributes() {
         var root = document.getElementById('wssw-attributes-root');
         if (!root) { return Promise.resolve(); }
-        return fetch(apiRoot + 'attributes')
+        var attrUrlWithCat = apiRoot + 'attributes' + (currentCatSlug ? '?category=' + encodeURIComponent(currentCatSlug) : '');
+        return fetch(attrUrlWithCat)
             .then(function (r) { return r.json(); })
             .then(function (groups) {
                 var state = parseState();

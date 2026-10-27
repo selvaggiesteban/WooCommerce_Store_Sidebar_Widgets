@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WooCommerce Store Sidebar Widgets (Responsive)
  * Description: Stable sidebar widgets using WP-REST API with Responsive Fullscreen Filter. Filters are wired to the product archive queries (attributes, price and category context).
- * Version: 2.3.1
+ * Version: 2.3.2
  * Author: Esteban Selvaggi
  */
 
@@ -112,8 +112,8 @@ class WSSW_Plugin_V2 {
 	}
 
 	public function enqueue_assets() {
-		wp_enqueue_style( 'wssw-style', WSSW_PLUGIN_URL . 'assets/css/style.css', array(), '2.3.1' );
-		wp_enqueue_script( 'wssw-script', WSSW_PLUGIN_URL . 'assets/js/scripts.js', array( 'jquery' ), '2.3.1', true );
+		wp_enqueue_style( 'wssw-style', WSSW_PLUGIN_URL . 'assets/css/style.css', array(), '2.3.2' );
+		wp_enqueue_script( 'wssw-script', WSSW_PLUGIN_URL . 'assets/js/scripts.js', array( 'jquery' ), '2.3.2', true );
 
 		$current_cat_id   = 0;
 		$current_cat_slug = '';
